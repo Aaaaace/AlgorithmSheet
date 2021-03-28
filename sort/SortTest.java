@@ -2,6 +2,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+/**
+ * 排序算法测试，TODO: 能够检验结果，能够计时，并且自动覆盖所有已实现的排序算法，最好能够计算内存使用情况
+ */
 public class SortTest {
     public static void main(String[] args) {
 
