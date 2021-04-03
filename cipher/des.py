@@ -109,24 +109,15 @@ class DES:
          2,  1, 14,  7,  4, 10,  8, 13, 15, 12,  9,  0,  3,  5,  6, 11],
     ]
 
-    P = [16, 7, 20, 21, 29, 12, 28, 17, 1, 15, 23, 26, 5, 18, 31, 10,
-         2, 8, 24, 14, 32, 27, 3, 9, 19, 13, 30, 6, 22, 11, 4, 25]
+    P = [16, 7, 20, 21, 29, 12, 28, 17,
+         1, 15, 23, 26, 5, 18, 31, 10,
+         2, 8, 24, 14, 32, 27, 3, 9,
+         19, 13, 30, 6, 22, 11, 4, 25]
 
     def __init__(self, key: int):
         self.key = key
-        self.key_56bits = self.permutate(key, self.PC1)
+        self.key_56bits = self.permutate(key, 64, self.PC1)
         self.subkeys = self.key_schedule()
-
-    def _process_single_round(self, block1: int, block2: int,  round: int) -> Tuple[int, int]:
-        '''一个回次 TODO
-
-        Args:
-            block1: 数据块，用十六进制整数表示
-            block2: 数据块，该块会经过feistel函数处理
-            round: 轮次，取0~15
-        '''
-        block_F = self.feistel(block2, round)
-        return block2, block1 ^ block_F
 
     def feistel(self, block: int, round: int):
         '''费斯妥函数
@@ -136,91 +127,126 @@ class DES:
             round: 轮次，取0~15
         '''
 
-        # 扩张
-        block_E = self.permutate(block, self.E)
+        # 扩张置换(32->48)
+        block_E = self.permutate(block, 32, self.E)
 
         # 与密钥混合
         block_mixed = block_E ^ self.subkeys[round]
 
-        # S盒
-        block_after_sbox = 0
+        # S盒(48->32)
+        block_sbox = 0
         for i in range(8):
-            block_after_sbox <<= 4
-            six_bits = block_mixed & 0x3f
-            block_after_sbox += self.S_BOX[i][six_bits]
-            block_mixed >>= 6
+            six_bits = block_mixed >> (48 - (i+1) * 6) & 0x3f
+            block_sbox <<= 4
+            block_sbox += self.S_BOX[i][six_bits]
 
         # 置换
-        block_P = self.permutate(block_after_sbox, self.P)
+        block_P = self.permutate(block_sbox, 32, self.P)
 
         return block_P
 
     def key_schedule(self):
         '''密钥调度，生成所有子密钥
         '''
+
+        def rotate_left(key_28bits, bits: int):
+            '''循环左移
+            密钥调度时使用
+
+            Args:
+                key_56bits: 56位密钥
+                bits: 移位位数，取1~28
+            '''
+            return ((key_28bits << bits) | (key_28bits >> 28-bits)) & (0xfffffff)
+
         subkeys = []
+        key_left_part = self.key_56bits >> 28
+        key_right_part = self.key_56bits & 0xfffffff
         for i in range(16):
-            key_56bits_rotated = self.rotate_left(
-                self.key_56bits, self.KEY_OFFSET_ACCUMULATION[i])
-            key_48bits = self.permutate(key_56bits_rotated, self.PC2)
+            key_left_part = rotate_left(key_left_part, self.KEY_OFFSET[i])
+            key_right_part = rotate_left(key_right_part, self.KEY_OFFSET[i])
+
+
+            key_48bits = self.permutate(((key_left_part << 28) | key_right_part), 56, self.PC2)
             subkeys.append(key_48bits)
+        
         return subkeys
 
-    def permutate(self, block: int, permutation) -> int:
+    def permutate(self, block: int, bits: int, permutation) -> int:
         '''根据输入的置换矩阵对原数据进行置换
 
         Args:
             block: 需要置换数据块，用十六进制整数表示
+            bits: block的位数，block高位为0时，无法判断共有多少位，所以需要标明
             permutation: 置换矩阵
         '''
         block_result = 0
         for i in range(len(permutation)):
-            bit = block >> (permutation[i] - 1) & 1
+            bit = (block >> (bits - permutation[i])) & 1
             block_result <<= 1
             block_result += bit
         return block_result
 
-    def rotate_left(self, key_56bits, bits: int):
-        '''循环左移
-        密钥调度时使用
+    def _des_block_encrypt(self, plain_block):
+        '''单个数据块加密
 
-        Args:
-            key_56bits: 56位密钥
-            bits: 移位位数，取1~28
+        Args：
+            plain_block： 64位明文数据块
         '''
-        return ((key_56bits << bits) | (key_56bits >> 56-bits)) & (0xffffffffffffff)
+        block = self.permutate(plain_block, 64, self.IP)
 
-    def _des_block_encrypt(self, block):
-        block = self.permutate(block, self.IP)
-
-        block1 = block >> 32
-        block2 = block & 0xffffffff
+        l = block >> 32
+        r = block & 0xffffffff
 
         for i in range(16):
-            block1, block2 = self._process_single_round(block1, block2, i)
+            l, r = r, l ^ self.feistel(r, i)
 
-        block = block1 << 32 | block2
+        # 最后一轮不做交换
+        l, r = r, l
+        encrypted_block = l << 32 | r
 
-        return self.permutate(block, self.FP)
+        return self.permutate(encrypted_block, 64, self.FP)
 
-    def encrypt(self, block: int) -> int:
-        return self._des_block_encrypt(block)
+    def _des_block_decrypt(self, encrypted_block):
+        '''单个数据块解密
 
-    def decrypt(self, block: int):
-        block = self.permutate(block, self.IP)
+        Args:
+            encrypted_block: 64位加密数据块
+        '''
+        block = self.permutate(encrypted_block, 64, self.IP)
 
-        block1 = block >> 32
-        block2 = block & 0xffffffff
+        l = block >> 32
+        r = block & 0xffffffff
 
         for i in range(15, -1, -1):
-            block1, block2 = self._process_single_round(block1, block2, i)
+            l, r = r, l ^ self.feistel(r, i)
 
-        block = block1 << 32 | block2
+        # 最后一轮不做交换
+        l, r = r, l
+        plain_text = l << 32 | r
 
-        return self.permutate(block, self.FP)
+        return self.permutate(plain_text, 64, self.FP)
+
+    def encrypt(self, plain_block: int) -> int:
+        return self._des_block_encrypt(plain_block)
+
+    def decrypt(self, encrypted_block: int):
+        return self._des_block_decrypt(encrypted_block)
 
 
 if __name__ == '__main__':
+    d = DES(0x7CA110454A1A6E57)
+
+    plain_text = 0x01A1D6D039776742
+    print(hex(plain_text))
+
+    encypted_text = d.encrypt(plain_text)
+    print(hex(encypted_text))  # 8CA64DE9C1B123A7
+
+    decypted_text = d.decrypt(encypted_text)
+    print(hex(decypted_text))
+
+    
     d = DES(0x0000000000000000)
 
     plain_text = 0x0000000000000000
@@ -232,4 +258,4 @@ if __name__ == '__main__':
     decypted_text = d.decrypt(encypted_text)
     print(hex(decypted_text))
 
-    
+    # d3 = DES(0x7CA110454A1A6E57)
