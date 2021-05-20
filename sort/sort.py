@@ -65,28 +65,28 @@ def quick_sort(inputlist):
     return inputlist
 
 
-def heap_rebuild(inputlist, index, length):
-    """
-    堆排序
-
-    :param inputlist:
-    :param index:
-    :param length:
-    :return:
-    """
-    lchild = index * 2 + 1
-    rchild = lchild + 1
-    if lchild < length:
-        heap_rebuild(inputlist, lchild, length)
-        if inputlist[lchild] > inputlist[index]:
-            inputlist[index], inputlist[lchild] = inputlist[lchild], inputlist[index]
-    if rchild < length:
-        heap_rebuild(inputlist, rchild, length)
-        if inputlist[rchild] > inputlist[index]:
-            inputlist[index], inputlist[rchild] = inputlist[rchild], inputlist[index]
-
 # 堆排序
 def heap_sort(inputlist):
+    def heap_rebuild(inputlist, index, length):
+        """
+        堆排序
+
+        :param inputlist:
+        :param index:
+        :param length:
+        :return:
+        """
+        lchild = index * 2 + 1
+        rchild = lchild + 1
+        if lchild < length:
+            heap_rebuild(inputlist, lchild, length)
+            if inputlist[lchild] > inputlist[index]:
+                inputlist[index], inputlist[lchild] = inputlist[lchild], inputlist[index]
+        if rchild < length:
+            heap_rebuild(inputlist, rchild, length)
+            if inputlist[rchild] > inputlist[index]:
+                inputlist[index], inputlist[rchild] = inputlist[rchild], inputlist[index]
+
     length = len(inputlist)
     # 重建完之后最大的元素在下标为0的位置
     heap_rebuild(inputlist, 0, length)

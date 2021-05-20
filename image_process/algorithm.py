@@ -32,8 +32,8 @@ def A(m, n):
 def my_simplex_method(f, A, b, Aeq, beq, lb, ub):
     '''
     未完成
-    <time>2018.11.27</time>
-    <summary>单纯型法，用于线性规划</summary>
+    2018.11.27
+    单纯型法，用于线性规划
     
     '''
     pass

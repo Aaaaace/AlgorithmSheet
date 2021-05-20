@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# 该哈希算法是质数取余
-# 且关键字只能为正整数
-# 初始化时需要参数为一一对应的关键字list和值list
-# 构造输入： keys列表，对应的values列表
-# 方法：
-# 1.     search(self,key):输入整数型关键字key，对应元素频数增一，返回对应的values。
-class HashTable(object):
 
+class HashTable(object):
+    '''该哈希算法是质数取余
+        且关键字只能为正整数
+        初始化时需要参数为一一对应的关键字list和值list
+        构造输入： keys列表，对应的values列表
+        方法：
+        1. search(self,key):输入整数型关键字key，对应元素频数增一，返回对应的values。
+    '''
     def prime_generator(self):
         """质数生成器，用于获取一个合适的哈希表长
         """
